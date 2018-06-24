@@ -13,7 +13,8 @@ def instantiate_camera(resolution=(640, 480), framerate=32):
     return camera
 
 
-def get_grayscale(stream):
+def get_frame(camera, stream):
+    camera.capture(stream, 'bgr', use_video_port=True)
     # stream.array should contain image data in BGR order
     grayscale = cv2.cvtColor(stream.array, cv2.COLOR_BGR2GRAY)
 
@@ -64,11 +65,10 @@ def main():
     camera = instantiate_camera()
     with PiRGBArray(camera) as stream:
         while cv2.waitKey(1) & 0xFF != ord('q'):
-            camera.capture(stream, 'bgr', use_video_port=True)
-            grayscale = get_grayscale(stream)
-            output = findWand(grayscale)
+            prev_frame = get_frame(camera, stream)
+            output = findWand(prev_frame)
 
-            cv2.imshow('frame', np.hstack([grayscale, output]))
+            cv2.imshow('frame', np.hstack([prev_frame, output]))
             stream.truncate(0)
 
         cv2.destroyAllWindows()    
