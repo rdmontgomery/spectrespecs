@@ -1,4 +1,5 @@
 import cv2
+import io
 import numpy as np
 from picamera.array import PiRGBArray
 from picamera import PiCamera
@@ -6,7 +7,7 @@ import time
 import threading
 
 
-def instantiate_camera(resolution=(640, 480), framerate=32):
+def instantiate_camera(resolution=(640, 480), framerate=24):
     camera = PiCamera()
     camera.resolution = resolution
     camera.framerate = framerate
@@ -14,9 +15,12 @@ def instantiate_camera(resolution=(640, 480), framerate=32):
 
 
 def get_frame(camera, stream):
-    camera.capture(stream, 'bgr', use_video_port=True)
-    # stream.array should contain image data in BGR order
-    grayscale = cv2.cvtColor(stream.array, cv2.COLOR_BGR2GRAY)
+    camera.capture(stream, format='jpeg')
+    data = np.fromstring(stream.getvalue(), dtype=np.uint8)
+    frame = cv2.imdecode(data, 1)
+    cv2.flip(frame, 1, frame)
+
+    grayscale = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
 
     cv2.equalizeHist(grayscale)
 
@@ -35,15 +39,16 @@ def get_frame(camera, stream):
 def findWand(grayscale):
     output = grayscale.copy()
 
-    circles = cv2.HoughCircles(grayscale,
-                               cv2.HOUGH_GRADIENT,
-                               dp=3,
-                               minDist=50,
-                               param1=240,
-                               param2=8,
-                               minRadius=4,
-                               maxRadius=15)
+    coords = cv2.HoughCircles(grayscale,
+                              cv2.HOUGH_GRADIENT,
+                              dp=3,
+                              minDist=50,
+                              param1=240,
+                              param2=8,
+                              minRadius=4,
+                              maxRadius=15)
     
+    circles = coords
     if circles is not None:
         circles = np.round(circles[0, :]).astype('int')
 
@@ -52,7 +57,7 @@ def findWand(grayscale):
             cv2.rectangle(output, (x-1, y-1), (x+1, y+1), (0, 0, 0), -1)
 
     # threading.Timer(1, findWand, [grayscale]).start()
-    return output
+    return output, coords
 
 
 def main():
@@ -63,13 +68,26 @@ def main():
                                0.03))
 
     camera = instantiate_camera()
-    with PiRGBArray(camera) as stream:
+    prev_frame = None
+    with io.BytesIO() as stream:
         while cv2.waitKey(1) & 0xFF != ord('q'):
-            prev_frame = get_frame(camera, stream)
-            output = findWand(prev_frame)
+            next_frame = get_frame(camera, stream)
+            output, old_points = findWand(next_frame)
+            print(old_points)
+
+            if prev_frame is not None:
+                print(prev_frame)
+                new_points, status, err = cv2.calcOpticalFlowPyrLK(prev_frame,
+                                                                   next_frame,
+                                                                   old_points,
+                                                                   None,
+                                                                   **lk_params)
+                print(new_points, status, err)
+            prev_frame = next_frame
 
             cv2.imshow('frame', np.hstack([prev_frame, output]))
-            stream.truncate(0)
+            stream.truncate()
+            stream.seek(0)
 
         cv2.destroyAllWindows()    
 
