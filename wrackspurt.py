@@ -73,15 +73,21 @@ def main():
         while cv2.waitKey(1) & 0xFF != ord('q'):
             next_frame = get_frame(camera, stream)
             output, old_points = findWand(next_frame)
-            print(old_points)
+            if old_points is not None:
+                old_points.shape = (old_points.shape[1], 1, old_points.shape[2])
+                #print(old_points)
+                old_points = old_points[:, :, 0:2][:, 0]
+                #print(old_points)
+                #print(old_points[:, 0])
 
             if prev_frame is not None:
-                print(prev_frame)
+                pass
+                # print(prev_frame)
                 new_points, status, err = cv2.calcOpticalFlowPyrLK(prev_frame,
                                                                    next_frame,
                                                                    old_points,
                                                                    None,
-                                                                   **lk_params)
+                                                                    **lk_params)
                 print(new_points, status, err)
             prev_frame = next_frame
 
