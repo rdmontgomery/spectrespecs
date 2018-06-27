@@ -59,14 +59,11 @@ def findWand(grayscale):
     if coords is not None:
         # The following are necessary for calcOpticalFlowPyrLK
         # Coordinates need shape (n, 1, 2), where n is the number of points
-        n = coords.shape[1]
-        coords.shape = (n, 1, coords.shape[2])
+        coords.shape = (coords.shape[1], 1, coords.shape[2])
         # Select just the (x, y) coords, removing the radius
         coords = coords[:, :, :2]
-        # Cast as float32
         coords = coords.astype(np.float32)
 
-    # threading.Timer(1, findWand, [grayscale]).start()
     return output, coords
 
 
